@@ -19,27 +19,60 @@ type AuthentifiedClient struct {
 
 func (a *AuthentifiedClient) Search(ctx context.Context, searchKey string) error {
 	seach := map[string]any{
-		"fond": "ACCO",
 		"recherche": map[string]any{
-			"operateur":      "ET",
-			"pageSize":       10,
-			"sort":           "SIGNATURE_DATE_DESC",
-			"typePagination": "DEFAULT",
-			"pageNumber":     1,
-			"champs": []map[string]any{
-				{
-					"operateur": "ET",
-					"criteres": []map[string]any{
-						{
+			"filtres": []any{
+				map[string]any{
+					"valeurs": []string{
+						"LOI",
+						"ORDONNANCE",
+						"ARRETE",
+					},
+					"facette": "NATURE",
+				},
+				map[string]any{
+					"dates": map[string]any{
+						"start": "2015-01-01",
+						"end":   "2018-01-31",
+					},
+					"facette": "DATE_SIGNATURE",
+				},
+			},
+			"sort":                  "SIGNATURE_DATE_DESC",
+			"fromAdvancedRecherche": false,
+			"secondSort":            "ID",
+			"champs": []any{
+				map[string]any{
+					"criteres": []any{
+						map[string]any{
+							"proximite": 2,
+							"valeur":    "dispositions",
+							"criteres": []any{
+								map[string]any{
+									"valeur":        "soins",
+									"operateur":     "ET",
+									"typeRecherche": "UN_DES_MOTS",
+								},
+								map[string]any{
+									"proximite":     "3",
+									"valeur":        "fonction publique",
+									"operateur":     "ET",
+									"typeRecherche": "TOUS_LES_MOTS_DANS_UN_CHAMP",
+								},
+							},
 							"operateur":     "ET",
-							"valeur":        searchKey,
 							"typeRecherche": "UN_DES_MOTS",
 						},
 					},
+					"operateur": "ET",
+					"typeChamp": "TITLE",
 				},
 			},
-			"typeChamp": "TITLE",
+			"pageSize":       10,
+			"operateur":      "ET",
+			"typePagination": "DEFAUT",
+			"pageNumber":     1,
 		},
+		"fond": "LODA_DATE",
 	}
 	payload, err := json.Marshal(seach)
 	if err != nil {

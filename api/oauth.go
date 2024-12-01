@@ -48,6 +48,7 @@ func (a *OauthClient) setToken(ctx context.Context, req *http.Request) error {
 	return nil
 }
 
+// Do will retrieve the token if not set
 func (a *OauthClient) Do(ctx context.Context, req *http.Request) (*http.Response, error) {
 	if a.Token == "" {
 		err := a.setToken(ctx, req)

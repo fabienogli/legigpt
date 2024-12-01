@@ -45,14 +45,23 @@ var rootCmd = &cobra.Command{
 
 		authentifiedClient := api.NewOauthClient(OauthCfg, httpClient)
 
-		authentifiedClient.Token = "ZXrDFTrDxQe86E8FhuWN5sFIIPvoifd61KfazDYQ1onxjC4c3Oaplb"
+		// tokenResponse, err := authentifiedClient.RetrievToken(ctx)
+
+		// if err != nil {
+		// 	log.Println(err)
+		// 	return err
+		// }
+		// log.Println(tokenResponse)
+
+		// to avoid searching for a token
+		authentifiedClient.Token = "41WoWiV0wo9WwhPB23C28MhNnZLm8HFkvP8swgNc5q53DpskrGiWbN"
 
 		authClient := api.AuthentifiedClient{
 			Client: authentifiedClient,
 			URL:    "https://sandbox-api.piste.gouv.fr/dila/legifrance/lf-engine-app",
 		}
-		// err = authClient.Search(ctx, "32h")
-		err = authClient.Ping(ctx)
+		err = authClient.Search(ctx, "32h")
+		// err = authClient.Ping(ctx)
 		log.Println(err)
 		// url := conf.AuthCodeURL("state", oauth2.AccessTypeOffline, oauth2.S256ChallengeOption(verifier))
 		// oauth2.NewClient(context.Background(), oauth2.TokenSource{})
