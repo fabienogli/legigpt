@@ -1,5 +1,6 @@
 
-https://developer.aife.economie.gouv.fr/en/apps/application/view/63ba6621-4b31-4c23-9294-9ea31da58ac9?api-manager=1
+https://piste.gouv.fr/index.php?option=com_apiportal&view=apitester&usage=api&apitab=tests&apiName=L%C3%A9gifrance&apiId=7e5a0e1d-ffcc-40be-a405-a1a5c1afe950&managerId=3&type=rest&apiVersion=2.4.2&Itemid=199&swaggerVersion=2.0&lang=en
+
 
 /search
 Recherche générique des documents indexés
@@ -12,3 +13,5 @@ Contenu d'un accord d'entreprise
   "id": "ACCOTEXT000037731479",
   "searchedString": "constitution 1958"
 }
+
+https://openapi-generator.tech/docs/installation

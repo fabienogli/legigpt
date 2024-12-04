@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 
 	"github.com/fabienogli/legigpt/api"
 	"github.com/fabienogli/legigpt/httputils"
@@ -43,7 +44,11 @@ var rootCmd = &cobra.Command{
 			ClientSecret: clientSecret,
 		}
 
-		authentifiedClient := api.NewOauthClient(OauthCfg, httpClient)
+		tokenFile := path.Join(os.TempDir(), "token.json")
+		log.Println("saving token into %s", tokenFile)
+		fileStore := api.NewFileStore(tokenFile)
+
+		authentifiedClient := api.NewOauthClient(OauthCfg, httpClient, fileStore)
 
 		// tokenResponse, err := authentifiedClient.RetrievToken(ctx)
 
@@ -54,15 +59,71 @@ var rootCmd = &cobra.Command{
 		// log.Println(tokenResponse)
 
 		// to avoid searching for a token
-		authentifiedClient.Token = "41WoWiV0wo9WwhPB23C28MhNnZLm8HFkvP8swgNc5q53DpskrGiWbN"
 
 		authClient := api.AuthentifiedClient{
 			Client: authentifiedClient,
 			URL:    "https://sandbox-api.piste.gouv.fr/dila/legifrance/lf-engine-app",
 		}
-		err = authClient.Search(ctx, "32h")
+
+		// results, err := authClient.Search(ctx, api.Search{
+		// 	Recherche: api.Recherche{
+		// 		Filtres: []api.Filtre{
+		// 			// 	{
+		// 			// 		Dates: Dates{
+		// 			// 			Start: "2015-01-01",
+		// 			// 			End:   "2023-01-31",
+		// 			// 		},
+		// 			// 		Facette: "DATE_SIGNATURE",
+		// 			// 	},
+		// 		},
+		// 		Sort:                  "SIGNATURE_DATE_DESC",
+		// 		FromAdvancedRecherche: false,
+		// 		SecondSort:            "ID",
+		// 		Champs: []api.Champ{
+		// 			{
+		// 				Criteres: []api.Critere{
+		// 					{
+		// 						Proximite: 2,
+		// 						Valeur:    "dispositions",
+		// 						Criteres: []api.Critere{
+		// 							{
+		// 								Valeur:        "maladie",
+		// 								Operateur:     "ET",
+		// 								TypeRecherche: "UN_DES_MOTS",
+		// 							},
+		// 							{
+		// 								// Proximite:     3,
+		// 								Valeur:        "congé",
+		// 								Operateur:     "ET",
+		// 								TypeRecherche: "UN_DES_MOTS",
+		// 							},
+		// 						},
+		// 						Operateur:     "ET",
+		// 						TypeRecherche: "UN_DES_MOTS",
+		// 					},
+		// 				},
+		// 				Operateur: api.OperatorAND,
+		// 				TypeChamp: api.FieldAll,
+		// 			},
+		// 		},
+		// 		PageSize:       10,
+		// 		Operateur:      api.OperatorAND,
+		// 		TypePagination: api.PaginationDefault,
+		// 		PageNumber:     1,
+		// 	},
+		// 	Fond: api.FondACCO,
+		// })
+
+		results, err := authClient.Consult(ctx, api.ConsultRequest{
+			ID: "ACCOTEXT000037731479",
+		})
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+		log.Println("results: %v", results.Acco.Attachment.Content)
+		log.Println("results: %v", results.Acco.AttachementUrl)
 		// err = authClient.Ping(ctx)
-		log.Println(err)
 		// url := conf.AuthCodeURL("state", oauth2.AccessTypeOffline, oauth2.S256ChallengeOption(verifier))
 		// oauth2.NewClient(context.Background(), oauth2.TokenSource{})
 		return nil

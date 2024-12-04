@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -12,8 +13,10 @@ import (
 	"github.com/fabienogli/legigpt/httputils"
 )
 
-type tokenResponse struct {
+type TokenResponse struct {
 	AccessToken string `json:"access_token"`
+	// ExpiredInSecond int    `json:"expires_in"`
+	//TODO add time
 }
 
 type OauthConfig struct {
@@ -27,37 +30,64 @@ type OauthClient struct {
 	url          string
 	clientSecret string
 	clientID     string
-	Token        string
+	filestore    *FileStore
 }
 
-func NewOauthClient(cfg OauthConfig, client httputils.Doer) *OauthClient {
+func NewOauthClient(cfg OauthConfig, client httputils.Doer, filestore *FileStore) *OauthClient {
 	return &OauthClient{
 		client:       client,
 		url:          cfg.URL,
 		clientID:     cfg.ClientID,
 		clientSecret: cfg.ClientSecret,
+		filestore:    filestore,
 	}
 }
 
-func (a *OauthClient) setToken(ctx context.Context, req *http.Request) error {
-	token, err := a.RetrievToken(ctx)
+func (a *OauthClient) getTokenFromFile() (TokenResponse, error) {
+	var resp TokenResponse
+	data, err := a.filestore.Get()
 	if err != nil {
-		return fmt.Errorf("while retrive token: %w", err)
+		return resp, fmt.Errorf("when a.filestore.Get: %w", err)
 	}
-	a.Token = token.AccessToken
+	err = json.Unmarshal(data, &resp)
+	if err != nil {
+		return resp, fmt.Errorf("when json.Unmarshal: %w", err)
+	}
+	return resp, nil
+}
+
+func (a *OauthClient) saveTokenFromFile(token TokenResponse) error {
+	data, err := json.Marshal(token)
+	if err != nil {
+		return fmt.Errorf("when json.marshal: %w", err)
+	}
+	err = a.filestore.Store(data)
+	if err != nil {
+		return fmt.Errorf("when a.filestore.Store: %w", err)
+	}
+	return nil
+}
+
+func (a *OauthClient) SetToken(ctx context.Context, req *http.Request) error {
+	token, err := a.getTokenFromFile()
+	if err != nil {
+		token, err := a.retrievToken(ctx)
+		if err != nil {
+			return fmt.Errorf("while retrive token: %w", err)
+		}
+		err = a.saveTokenFromFile(token)
+		if err != nil {
+			log.Println("err when saving token: %v", err)
+		}
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+
 	return nil
 }
 
 // Do will retrieve the token if not set
 func (a *OauthClient) Do(ctx context.Context, req *http.Request) (*http.Response, error) {
-	if a.Token == "" {
-		err := a.setToken(ctx, req)
-		if err != nil {
-			return nil, err
-		}
-	}
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", a.Token))
-
+	a.SetToken(ctx, req)
 	resp, err := a.client.Do(ctx, req)
 	if err != nil {
 		return resp, err
@@ -66,7 +96,7 @@ func (a *OauthClient) Do(ctx context.Context, req *http.Request) (*http.Response
 	return resp, err
 }
 
-func (a *OauthClient) RetrievToken(ctx context.Context) (tokenResponse, error) {
+func (a *OauthClient) retrievToken(ctx context.Context) (TokenResponse, error) {
 
 	payload := url.Values{
 		"grant_type":    []string{"client_credentials"},
@@ -78,28 +108,28 @@ func (a *OauthClient) RetrievToken(ctx context.Context) (tokenResponse, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.url, strings.NewReader(payload.Encode()))
 
 	if err != nil {
-		return tokenResponse{}, fmt.Errorf("when http.NewRequest: %w", err)
+		return TokenResponse{}, fmt.Errorf("when http.NewRequest: %w", err)
 	}
 
 	req.Header.Add("Content-type", "application/x-www-form-urlencoded")
 	resp, err := a.client.Do(ctx, req)
 
 	if err != nil {
-		return tokenResponse{}, fmt.Errorf("resp: %#v, err: %w", resp, err)
+		return TokenResponse{}, fmt.Errorf("resp: %#v, err: %w", resp, err)
 	}
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return tokenResponse{}, fmt.Errorf("when io.ReadAll: %w", err)
+		return TokenResponse{}, fmt.Errorf("when io.ReadAll: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return tokenResponse{}, fmt.Errorf("wrong status code(%d), resp=%s", resp.StatusCode, data)
+		return TokenResponse{}, fmt.Errorf("wrong status code(%d), resp=%s", resp.StatusCode, data)
 	}
-	var respp tokenResponse
+	var respp TokenResponse
 	err = json.Unmarshal(data, &respp)
 	if err != nil {
-		return tokenResponse{}, fmt.Errorf("when json.Unmarshal (resp=%s): %w", data, err)
+		return TokenResponse{}, fmt.Errorf("when json.Unmarshal (resp=%s): %w", data, err)
 	}
 	return respp, nil
 }
