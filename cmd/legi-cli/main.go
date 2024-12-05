@@ -13,7 +13,7 @@ import (
 	"github.com/fabienogli/legigpt/llmx"
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
-	"github.com/tmc/langchaingo/llms/mistral"
+	"github.com/tmc/langchaingo/llms/ollama"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -61,30 +61,30 @@ var rootCmd = &cobra.Command{
 		dealLooker := deallooker.NewDealLooker(authClient)
 
 		//local
-		// llm, err := ollama.New(ollama.WithModel("llama2"))
-		// if err != nil {
-		// 	return fmt.Errorf("")
-		// }
+		llm, err := ollama.New(ollama.WithModel("smollm"))
+		if err != nil {
+			return fmt.Errorf("")
+		}
 
 		//using mistral AI
 		// not working
-		mistralAPIKEY := os.Getenv("MISTRAL_API_KEY")
-		if clientSecret == "" {
-			return fmt.Errorf("key MISTRAL_API_KEY empty")
-		}
-		llm, err := mistral.New(mistral.WithAPIKey(mistralAPIKEY))
+		// mistralAPIKEY := os.Getenv("MISTRAL_API_KEY")
+		// if clientSecret == "" {
+		// 	return fmt.Errorf("key MISTRAL_API_KEY empty")
+		// }
+		// llm, err := mistral.New(mistral.WithAPIKey(mistralAPIKEY))
 		if err != nil {
 			return fmt.Errorf("when llm new: %w", err)
 		}
 
 		gpt := llmx.NewGPT(llm)
 
-		summary, err := gpt.Summarize(ctx, "petit texte à résumé")
-		if err != nil {
-			return err
-		}
-		log.Println(summary)
-		return nil
+		// summary, err := gpt.Summarize(ctx, "petit texte à résumé")
+		// if err != nil {
+		// 	return err
+		// }
+		// log.Println(summary)
+		// return nil
 
 		accords, err := dealLooker.Search(ctx, deallooker.SearchQuery{
 			Title:      "congé",
