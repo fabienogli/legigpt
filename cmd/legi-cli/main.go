@@ -8,9 +8,12 @@ import (
 	"path"
 
 	"github.com/fabienogli/legigpt/api"
+	"github.com/fabienogli/legigpt/deallooker"
 	"github.com/fabienogli/legigpt/httputils"
+	"github.com/fabienogli/legigpt/llmx"
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
+	"github.com/tmc/langchaingo/llms/mistral"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -50,82 +53,62 @@ var rootCmd = &cobra.Command{
 
 		authentifiedClient := api.NewOauthClient(OauthCfg, httpClient, fileStore)
 
-		// tokenResponse, err := authentifiedClient.RetrievToken(ctx)
-
-		// if err != nil {
-		// 	log.Println(err)
-		// 	return err
-		// }
-		// log.Println(tokenResponse)
-
-		// to avoid searching for a token
-
-		authClient := api.AuthentifiedClient{
+		authClient := &api.AuthentifiedClient{
 			Client: authentifiedClient,
 			URL:    "https://sandbox-api.piste.gouv.fr/dila/legifrance/lf-engine-app",
 		}
 
-		// results, err := authClient.Search(ctx, api.Search{
-		// 	Recherche: api.Recherche{
-		// 		Filtres: []api.Filtre{
-		// 			// 	{
-		// 			// 		Dates: Dates{
-		// 			// 			Start: "2015-01-01",
-		// 			// 			End:   "2023-01-31",
-		// 			// 		},
-		// 			// 		Facette: "DATE_SIGNATURE",
-		// 			// 	},
-		// 		},
-		// 		Sort:                  "SIGNATURE_DATE_DESC",
-		// 		FromAdvancedRecherche: false,
-		// 		SecondSort:            "ID",
-		// 		Champs: []api.Champ{
-		// 			{
-		// 				Criteres: []api.Critere{
-		// 					{
-		// 						Proximite: 2,
-		// 						Valeur:    "dispositions",
-		// 						Criteres: []api.Critere{
-		// 							{
-		// 								Valeur:        "maladie",
-		// 								Operateur:     "ET",
-		// 								TypeRecherche: "UN_DES_MOTS",
-		// 							},
-		// 							{
-		// 								// Proximite:     3,
-		// 								Valeur:        "congé",
-		// 								Operateur:     "ET",
-		// 								TypeRecherche: "UN_DES_MOTS",
-		// 							},
-		// 						},
-		// 						Operateur:     "ET",
-		// 						TypeRecherche: "UN_DES_MOTS",
-		// 					},
-		// 				},
-		// 				Operateur: api.OperatorAND,
-		// 				TypeChamp: api.FieldAll,
-		// 			},
-		// 		},
-		// 		PageSize:       10,
-		// 		Operateur:      api.OperatorAND,
-		// 		TypePagination: api.PaginationDefault,
-		// 		PageNumber:     1,
-		// 	},
-		// 	Fond: api.FondACCO,
-		// })
+		dealLooker := deallooker.NewDealLooker(authClient)
 
-		results, err := authClient.Consult(ctx, api.ConsultRequest{
-			ID: "ACCOTEXT000037731479",
-		})
+		//local
+		// llm, err := ollama.New(ollama.WithModel("llama2"))
+		// if err != nil {
+		// 	return fmt.Errorf("")
+		// }
+
+		//using mistral AI
+		// not working
+		mistralAPIKEY := os.Getenv("MISTRAL_API_KEY")
+		if clientSecret == "" {
+			return fmt.Errorf("key MISTRAL_API_KEY empty")
+		}
+		llm, err := mistral.New(mistral.WithAPIKey(mistralAPIKEY))
 		if err != nil {
-			log.Println(err)
+			return fmt.Errorf("when llm new: %w", err)
+		}
+
+		gpt := llmx.NewGPT(llm)
+
+		summary, err := gpt.Summarize(ctx, "petit texte à résumé")
+		if err != nil {
 			return err
 		}
-		log.Println("results: %v", results.Acco.Attachment.Content)
-		log.Println("results: %v", results.Acco.AttachementUrl)
-		// err = authClient.Ping(ctx)
-		// url := conf.AuthCodeURL("state", oauth2.AccessTypeOffline, oauth2.S256ChallengeOption(verifier))
-		// oauth2.NewClient(context.Background(), oauth2.TokenSource{})
+		log.Println(summary)
+		return nil
+
+		accords, err := dealLooker.Search(ctx, deallooker.SearchQuery{
+			Title:      "congé",
+			PageSize:   1,
+			PageNumber: 1,
+		})
+		if err != nil {
+			return fmt.Errorf("when dealLooker.Search: %w", err)
+		}
+		log.Println("total: ", accords.Total)
+
+		var contents []deallooker.Content
+		for _, accord := range accords.Accords {
+			content, err := dealLooker.GetContent(ctx, accord.ID)
+			if err != nil {
+				return fmt.Errorf("when dealLooker.GetContent: %w", err)
+			}
+			summary, err := gpt.Summarize(ctx, content.Texte)
+			if err != nil {
+				return fmt.Errorf("when ollamaTest: %w", err)
+			}
+			log.Println("Summary: ", summary)
+			contents = append(contents, content)
+		}
 		return nil
 	},
 }

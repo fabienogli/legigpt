@@ -18,15 +18,16 @@ type Search struct {
 }
 
 type Recherche struct {
-	Filtres               []Filtre   `json:"filtres"`
-	Sort                  string     `json:"sort"`
-	FromAdvancedRecherche bool       `json:"fromAdvancedRecherche"`
-	SecondSort            string     `json:"secondSort"`
-	Champs                []Champ    `json:"champs"`
-	PageSize              int        `json:"pageSize"`
-	Operateur             Operator   `json:"operateur"`
-	TypePagination        Pagination `json:"typePagination"`
-	PageNumber            int        `json:"pageNumber"`
+	Filtres               []Filtre `json:"filtres"`
+	Sort                  string   `json:"sort"`
+	FromAdvancedRecherche bool     `json:"fromAdvancedRecherche"`
+	SecondSort            string   `json:"secondSort"`
+	Champs                []Champ  `json:"champs"`
+	//PageSize max: (max=100)
+	PageSize       int        `json:"pageSize"`
+	Operateur      Operator   `json:"operateur"`
+	TypePagination Pagination `json:"typePagination"`
+	PageNumber     int        `json:"pageNumber"`
 }
 
 type Filtre struct {
