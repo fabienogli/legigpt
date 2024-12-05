@@ -5,14 +5,16 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path"
 
-	"github.com/fabienogli/legigpt/api"
-	"github.com/fabienogli/legigpt/deallooker"
+	"github.com/fabienogli/legigpt"
 	"github.com/fabienogli/legigpt/httputils"
-	"github.com/fabienogli/legigpt/llmx"
-	"github.com/joho/godotenv"
+	"github.com/fabienogli/legigpt/internal/domain"
+	"github.com/fabienogli/legigpt/internal/usecase"
+	"github.com/fabienogli/legigpt/pkg/legifranceapi"
+	"github.com/fabienogli/legigpt/pkg/store"
 	"github.com/spf13/cobra"
+	"github.com/tmc/langchaingo/llms"
+	"github.com/tmc/langchaingo/llms/mistral"
 	"github.com/tmc/langchaingo/llms/ollama"
 )
 
@@ -22,71 +24,26 @@ var rootCmd = &cobra.Command{
 	Short: "Legi allows to search legi API",
 	// Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := godotenv.Load(".env")
+		cfg, err := legigpt.InitConfiguration()
 		if err != nil {
-			return fmt.Errorf("when loading.env: %w", err)
-		}
-
-		clientID := os.Getenv("AIFE_CLIENT_ID")
-		if clientID == "" {
-			return fmt.Errorf("key AIFE_CLIENT_ID empty")
-		}
-		clientSecret := os.Getenv("AIFE_CLIENT_SECRET")
-		if clientSecret == "" {
-			return fmt.Errorf("key AIFE_CLIENT_SECRET empty")
+			return fmt.Errorf("when init Config: %w", err)
 		}
 		ctx := cmd.Context()
 
-		httpClient := httputils.NewResponseLsogger(
-			httputils.NewClient(http.DefaultClient),
-		)
+		authClient := initDealLooker(cfg.DealLookerConfiguration)
 
-		OauthCfg := api.OauthConfig{
-			URL:          "https://sandbox-oauth.piste.gouv.fr/api/oauth/token",
-			ClientID:     clientID,
-			ClientSecret: clientSecret,
-		}
+		dealLooker := usecase.NewLegifrance(authClient)
 
-		tokenFile := path.Join(os.TempDir(), "token.json")
-		log.Println("saving token into %s", tokenFile)
-		fileStore := api.NewFileStore(tokenFile)
-
-		authentifiedClient := api.NewOauthClient(OauthCfg, httpClient, fileStore)
-
-		authClient := &api.AuthentifiedClient{
-			Client: authentifiedClient,
-			URL:    "https://sandbox-api.piste.gouv.fr/dila/legifrance/lf-engine-app",
-		}
-
-		dealLooker := deallooker.NewDealLooker(authClient)
-
-		//local
-		llm, err := ollama.New(ollama.WithModel("smollm"))
-		if err != nil {
-			return fmt.Errorf("")
-		}
-
-		//using mistral AI
-		// not working
-		// mistralAPIKEY := os.Getenv("MISTRAL_API_KEY")
-		// if clientSecret == "" {
-		// 	return fmt.Errorf("key MISTRAL_API_KEY empty")
-		// }
-		// llm, err := mistral.New(mistral.WithAPIKey(mistralAPIKEY))
+		llm, err := initGPT(cfg.GPTConfiguration)
 		if err != nil {
 			return fmt.Errorf("when llm new: %w", err)
 		}
 
-		gpt := llmx.NewGPT(llm)
+		gpt := usecase.NewGPT(llm, 40)
 
-		// summary, err := gpt.Summarize(ctx, "petit texte à résumé")
-		// if err != nil {
-		// 	return err
-		// }
-		// log.Println(summary)
-		// return nil
+		top := usecase.NewDealLooker(dealLooker, gpt)
 
-		accords, err := dealLooker.Search(ctx, deallooker.SearchQuery{
+		err = top.Search(ctx, domain.SearchQuery{
 			Title:      "congé",
 			PageSize:   1,
 			PageNumber: 1,
@@ -94,23 +51,36 @@ var rootCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("when dealLooker.Search: %w", err)
 		}
-		log.Println("total: ", accords.Total)
-
-		var contents []deallooker.Content
-		for _, accord := range accords.Accords {
-			content, err := dealLooker.GetContent(ctx, accord.ID)
-			if err != nil {
-				return fmt.Errorf("when dealLooker.GetContent: %w", err)
-			}
-			summary, err := gpt.Summarize(ctx, content.Texte)
-			if err != nil {
-				return fmt.Errorf("when ollamaTest: %w", err)
-			}
-			log.Println("Summary: ", summary)
-			contents = append(contents, content)
-		}
 		return nil
 	},
+}
+
+func initGPT(cfg legigpt.GPTConfiguration) (llms.Model, error) {
+	if cfg.Local != nil {
+		return ollama.New(ollama.WithModel(*cfg.Local))
+
+	}
+	if cfg.Mistral != nil {
+		return mistral.New(mistral.WithAPIKey(cfg.Mistral.ApiKey))
+	}
+	return nil, fmt.Errorf("when initializing gpt")
+}
+
+func initDealLooker(cfg legigpt.DealLookerConfiguration) *legifranceapi.AuthentifiedClient {
+	httpClient := httputils.NewResponseLsogger(
+		httputils.NewClient(http.DefaultClient),
+	)
+
+	log.Println("saving token into %s", cfg.TokenFilename)
+
+	fileStore := store.NewFileStore(cfg.TokenFilename)
+
+	authentifiedClient := legifranceapi.NewOauthClient(cfg.LegiFranceConfiguration, httpClient, fileStore)
+
+	return &legifranceapi.AuthentifiedClient{
+		Client: authentifiedClient,
+		URL:    "https://sandbox-api.piste.gouv.fr/dila/legifrance/lf-engine-app",
+	}
 }
 
 func init() {

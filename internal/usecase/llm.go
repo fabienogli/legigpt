@@ -1,34 +1,45 @@
-package llmx
+package usecase
 
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/tmc/langchaingo/llms"
 )
 
 type GPT struct {
-	model llms.Model
+	model       llms.Model
+	summarySize int
 }
 
-func NewGPT(model llms.Model) *GPT {
+func NewGPT(model llms.Model, summarySize int) *GPT {
 	return &GPT{
-		model: model,
+		model:       model,
+		summarySize: summarySize,
 	}
 }
 
 func (g *GPT) Summarize(ctx context.Context, toSummarize string) (string, error) {
 	response, err := g.model.GenerateContent(ctx, []llms.MessageContent{
 		{
-			Role: llms.ChatMessageTypeHuman,
+			Role: llms.ChatMessageTypeSystem,
 			Parts: []llms.ContentPart{
 				llms.TextContent{
 					Text: fmt.Sprintf(`
-Summarize the following text wrapped between the tag <ACCORD></ACCORD>
-In French language with maximum 100 characters:
-<ACCORD>%s</ACCORD>
-The summary will be in french`, toSummarize),
+You are a specialized assistant in text summarizing.
+Your input is a french text
+Your output is a french summary  in less than %d characters. The ouptut is in french.
+The summary should be clear, short and cover the main points within the text`, g.summarySize),
+				},
+			},
+		},
+		{
+			Role: llms.ChatMessageTypeHuman,
+			Parts: []llms.ContentPart{
+				llms.TextContent{
+					Text: fmt.Sprintf(`[START OF TEXT]
+%s
+[END OF TEXT]`, toSummarize),
 				},
 			},
 		},
@@ -43,6 +54,5 @@ The summary will be in french`, toSummarize),
 	if len(response.Choices) == 0 {
 		return "", fmt.Errorf("no choices: %w", err)
 	}
-	log.Println(response.Choices)
 	return response.Choices[0].Content, nil
 }

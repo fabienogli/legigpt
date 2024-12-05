@@ -1,4 +1,4 @@
-package api
+package legifranceapi
 
 import (
 	"bytes"

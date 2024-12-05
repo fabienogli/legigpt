@@ -22,7 +22,6 @@ func (a *ResponseLogger) Do(ctx context.Context, req *http.Request) (*http.Respo
 	slog.Info("requesting", "url", req.URL, "headers", req.Header)
 	resp, err := a.client.Do(ctx, req)
 	if err != nil {
-		slog.Error("err when do: %w", err)
 		return resp, err
 	}
 	buf := bytes.Buffer{}

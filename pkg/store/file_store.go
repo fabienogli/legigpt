@@ -1,6 +1,7 @@
-package api
+package store
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -16,7 +17,7 @@ func NewFileStore(filename string) *FileStore {
 	}
 }
 
-func (t *FileStore) Store(data []byte) error {
+func (t *FileStore) Store(ctx context.Context, data []byte) error {
 	f, err := os.OpenFile(t.filename, os.O_WRONLY, os.ModePerm)
 	if errors.Is(err, os.ErrNotExist) {
 		f, err = os.Create(t.filename)
@@ -31,6 +32,6 @@ func (t *FileStore) Store(data []byte) error {
 	return nil
 }
 
-func (t *FileStore) Get() ([]byte, error) {
+func (t *FileStore) Get(ctx context.Context) ([]byte, error) {
 	return os.ReadFile(t.filename)
 }

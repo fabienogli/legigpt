@@ -1,4 +1,4 @@
-package api
+package legifranceapi
 
 import (
 	"context"
@@ -30,10 +30,15 @@ type OauthClient struct {
 	url          string
 	clientSecret string
 	clientID     string
-	filestore    *FileStore
+	filestore    cache
 }
 
-func NewOauthClient(cfg OauthConfig, client httputils.Doer, filestore *FileStore) *OauthClient {
+type cache interface {
+	Store(ctx context.Context, data []byte) error
+	Get(ctx context.Context) ([]byte, error)
+}
+
+func NewOauthClient(cfg OauthConfig, client httputils.Doer, filestore cache) *OauthClient {
 	return &OauthClient{
 		client:       client,
 		url:          cfg.URL,
@@ -43,9 +48,9 @@ func NewOauthClient(cfg OauthConfig, client httputils.Doer, filestore *FileStore
 	}
 }
 
-func (a *OauthClient) getTokenFromFile() (TokenResponse, error) {
+func (a *OauthClient) getTokenFromFile(ctx context.Context) (TokenResponse, error) {
 	var resp TokenResponse
-	data, err := a.filestore.Get()
+	data, err := a.filestore.Get(ctx)
 	if err != nil {
 		return resp, fmt.Errorf("when a.filestore.Get: %w", err)
 	}
@@ -56,12 +61,12 @@ func (a *OauthClient) getTokenFromFile() (TokenResponse, error) {
 	return resp, nil
 }
 
-func (a *OauthClient) saveTokenFromFile(token TokenResponse) error {
+func (a *OauthClient) saveTokenFromFile(ctx context.Context, token TokenResponse) error {
 	data, err := json.Marshal(token)
 	if err != nil {
 		return fmt.Errorf("when json.marshal: %w", err)
 	}
-	err = a.filestore.Store(data)
+	err = a.filestore.Store(ctx, data)
 	if err != nil {
 		return fmt.Errorf("when a.filestore.Store: %w", err)
 	}
@@ -69,13 +74,13 @@ func (a *OauthClient) saveTokenFromFile(token TokenResponse) error {
 }
 
 func (a *OauthClient) SetToken(ctx context.Context, req *http.Request) error {
-	token, err := a.getTokenFromFile()
+	token, err := a.getTokenFromFile(ctx)
 	if err != nil {
 		token, err := a.retrievToken(ctx)
 		if err != nil {
 			return fmt.Errorf("while retrive token: %w", err)
 		}
-		err = a.saveTokenFromFile(token)
+		err = a.saveTokenFromFile(ctx, token)
 		if err != nil {
 			log.Println("err when saving token: %v", err)
 		}
