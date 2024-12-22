@@ -23,7 +23,7 @@ func NewLegifrance(legiSearcher legiApiSearcher) *Legifrance {
 	}
 }
 
-func (d *Legifrance) Search(ctx context.Context, query domain.SearchQuery) (domain.AccordsWrapped, error) {
+func (d *Legifrance) Search(ctx context.Context, query domain.SearchQuery) (domain.DealResult, error) {
 	results, err := d.legiSearcher.Search(ctx, legifranceapi.Search{
 		Recherche: legifranceapi.Recherche{
 			Filtres: []legifranceapi.Filtre{
@@ -65,7 +65,7 @@ func (d *Legifrance) Search(ctx context.Context, query domain.SearchQuery) (doma
 					TypeChamp: legifranceapi.FieldAll,
 				},
 			},
-			PageSize:       query.PageSize,
+			PageSize:       query.LimitSize,
 			Operateur:      legifranceapi.OperatorAND,
 			TypePagination: legifranceapi.PaginationDefault,
 			PageNumber:     query.PageNumber,
@@ -73,7 +73,7 @@ func (d *Legifrance) Search(ctx context.Context, query domain.SearchQuery) (doma
 		Fond: legifranceapi.FondACCO,
 	})
 	if err != nil {
-		return domain.AccordsWrapped{}, fmt.Errorf("when search: %w", err)
+		return domain.DealResult{}, fmt.Errorf("when search: %w", err)
 	}
 
 	var accords []domain.Accord
@@ -86,21 +86,20 @@ func (d *Legifrance) Search(ctx context.Context, query domain.SearchQuery) (doma
 			})
 		}
 	}
-	return domain.AccordsWrapped{
+	return domain.DealResult{
 		Accords: accords,
 		Total:   results.TotalResultNumber,
 	}, nil
 }
 
-func (d *Legifrance) GetContent(ctx context.Context, id string) (domain.Content, error) {
+func (d *Legifrance) GetContent(ctx context.Context, accord domain.Accord) (domain.Accord, error) {
 	results, err := d.legiSearcher.Consult(ctx, legifranceapi.ConsultRequest{
-		ID: id,
+		ID: accord.ID,
 	})
 	if err != nil {
-		return domain.Content{}, fmt.Errorf("when consult: %w", err)
+		return accord, fmt.Errorf("when consult: %w", err)
 	}
-	return domain.Content{
-		Texte: results.Acco.Attachment.Content,
-	}, nil
+	accord.Texte = results.Acco.Attachment.Content
+	return accord, nil
 
 }

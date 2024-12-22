@@ -12,6 +12,7 @@ import (
 type Configuration struct {
 	DealLookerConfiguration DealLookerConfiguration
 	GPTConfiguration        GPTConfiguration
+	FolderStore             string
 }
 
 type DealLookerConfiguration struct {
@@ -48,7 +49,7 @@ func InitConfiguration() (Configuration, error) {
 		ClientSecret: clientSecret,
 	}
 
-	tokenFile := path.Join(os.TempDir(), "token.json")
+	folderStore := os.TempDir()
 
 	// using mistral AI
 	// not working
@@ -56,11 +57,12 @@ func InitConfiguration() (Configuration, error) {
 	// if clientSecret == "" {
 	// 	return Configuration{}, fmt.Errorf("key MISTRAL_API_KEY empty")
 	// }
-	gptLocal := "smollm"
+	gptLocal := "llama2"
 	return Configuration{
+		FolderStore: folderStore,
 		DealLookerConfiguration: DealLookerConfiguration{
 			LegiFranceConfiguration: OauthCfg,
-			TokenFilename:           tokenFile,
+			TokenFilename:           path.Join(folderStore, "token.json"),
 		},
 		GPTConfiguration: GPTConfiguration{
 			Local: &gptLocal,

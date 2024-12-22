@@ -15,3 +15,5 @@ Contenu d'un accord d'entreprise
 }
 
 https://openapi-generator.tech/docs/installation
+
+https://go.dev/blog/llmpowered

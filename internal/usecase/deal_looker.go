@@ -9,12 +9,13 @@ import (
 )
 
 type legiSearcher interface {
-	Search(ctx context.Context, query domain.SearchQuery) (domain.AccordsWrapped, error)
-	GetContent(ctx context.Context, id string) (domain.Content, error)
+	Search(ctx context.Context, query domain.SearchQuery) (domain.DealResult, error)
+	GetContent(context.Context, domain.Accord) (domain.Accord, error)
 }
 
 type gpt interface {
 	Summarize(ctx context.Context, toSummarize string) (string, error)
+	FindSimilitude(ctx context.Context, knowledge []string, delimiter, searchSimilarity string) (string, error)
 }
 
 type DealLooker struct {
@@ -29,30 +30,36 @@ func NewDealLooker(legiSearcher legiSearcher, gpt gpt) *DealLooker {
 	}
 }
 
-func (d *DealLooker) Search(ctx context.Context, query domain.SearchQuery) error {
-	// accords, err := d.legiSearcher.Search(ctx, domain.SearchQuery{
-	// 	Title:      "congé",
-	// 	PageSize:   1,
-	// 	PageNumber: 1,
-	// })
+func (d *DealLooker) Search(ctx context.Context, query domain.SearchQuery) (domain.DealResult, error) {
 	accords, err := d.legiSearcher.Search(ctx, query)
 	if err != nil {
-		return fmt.Errorf("when dealLooker.Search: %w", err)
+		return domain.DealResult{}, fmt.Errorf("when dealLooker.Search: %w", err)
 	}
 	log.Println("total: ", accords.Total)
 
-	var contents []domain.Content
-	for _, accord := range accords.Accords {
-		content, err := d.legiSearcher.GetContent(ctx, accord.ID)
+	for i, accord := range accords.Accords {
+		content, err := d.legiSearcher.GetContent(ctx, accord)
 		if err != nil {
-			return fmt.Errorf("when dealLooker.GetContent: %w", err)
+			return domain.DealResult{}, fmt.Errorf("when dealLooker.GetContent: %w", err)
 		}
-		summary, err := d.gpt.Summarize(ctx, content.Texte)
-		if err != nil {
-			return fmt.Errorf("when ollamaTest: %w", err)
-		}
-		log.Println("Summary: ", summary)
-		contents = append(contents, content)
+		accords.Accords[i] = content
 	}
-	return nil
+	return accords, nil
+}
+
+func (d *DealLooker) Rag(ctx context.Context, deals []domain.Accord, keyword string) (string, error) {
+	//joining the deals so you can wrap it in a prompt
+	delimiter := "________________________________________"
+	textJoin := make([]string, len(deals))
+	for i, deal := range deals {
+		textJoin[i] = deal.Texte
+	}
+
+	bestDeal, err := d.gpt.FindSimilitude(ctx, textJoin, delimiter, keyword)
+
+	if err != nil {
+		return "", fmt.Errorf("when finding similiraties: %w", err)
+	}
+
+	return bestDeal, nil
 }

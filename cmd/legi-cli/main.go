@@ -3,12 +3,15 @@ package main
 import (
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
+	"path"
 
 	"github.com/fabienogli/legigpt"
 	"github.com/fabienogli/legigpt/httputils"
 	"github.com/fabienogli/legigpt/internal/domain"
+	"github.com/fabienogli/legigpt/internal/repository"
 	"github.com/fabienogli/legigpt/internal/usecase"
 	"github.com/fabienogli/legigpt/pkg/legifranceapi"
 	"github.com/fabienogli/legigpt/pkg/store"
@@ -43,14 +46,38 @@ var rootCmd = &cobra.Command{
 
 		top := usecase.NewDealLooker(dealLooker, gpt)
 
-		err = top.Search(ctx, domain.SearchQuery{
-			Title:      "congé",
-			PageSize:   1,
-			PageNumber: 1,
-		})
+		query := domain.SearchQuery{
+			Title:      "télétravail",
+			LimitSize:  40,
+			PageNumber: 0,
+		}
+
+		slog.Info("looking for query", "query", query)
+
+		deals, err := top.Search(ctx, query)
 		if err != nil {
 			return fmt.Errorf("when dealLooker.Search: %w", err)
 		}
+		//Storing file
+		outHistoryFile := path.Join(cfg.FolderStore, "history.json")
+		slog.Info("storing result", "file", outHistoryFile)
+		historyFile := store.NewFileStore(outHistoryFile)
+		dbSearch := repository.NewDealRepository(historyFile)
+		err = dbSearch.Store(ctx, domain.SearchHistory{
+			Query:    query,
+			Response: deals,
+		})
+		if err != nil {
+			return fmt.Errorf("error storing searches: %w", err)
+		}
+
+		slog.Info("Finding similarities")
+		bestDeal, err := top.Rag(ctx, deals.Accords, "Je veux avoir autant de télétravail que je veux")
+		if err != nil {
+			return fmt.Errorf("when rag: %w", err)
+		}
+		slog.Info("found best Deal", "best_deal", bestDeal)
+
 		return nil
 	},
 }
@@ -67,9 +94,10 @@ func initGPT(cfg legigpt.GPTConfiguration) (llms.Model, error) {
 }
 
 func initDealLooker(cfg legigpt.DealLookerConfiguration) *legifranceapi.AuthentifiedClient {
-	httpClient := httputils.NewResponseLsogger(
-		httputils.NewClient(http.DefaultClient),
-	)
+	httpClient :=
+		// httputils.NewResponseLsogger(
+		httputils.NewClient(http.DefaultClient)
+	// )
 
 	log.Println("saving token into %s", cfg.TokenFilename)
 
