@@ -76,13 +76,13 @@ func (a *OauthClient) saveTokenFromFile(ctx context.Context, token TokenResponse
 func (a *OauthClient) SetToken(ctx context.Context, req *http.Request) error {
 	token, err := a.getTokenFromFile(ctx)
 	if err != nil {
-		token, err := a.retrievToken(ctx)
+		token, err = a.retrievToken(ctx)
 		if err != nil {
 			return fmt.Errorf("while retrive token: %w", err)
 		}
 		err = a.saveTokenFromFile(ctx, token)
 		if err != nil {
-			log.Println("err when saving token: %v", err)
+			log.Printf("err when saving token: %v", err)
 		}
 	}
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
